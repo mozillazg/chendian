@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import print_function, unicode_literals
 import datetime
 import logging
+import os
 import re
+import sys
 
+__version__ = '0.1.1'
+encoding = sys.stdout.encoding
 logger = logging.getLogger(__name__)
 
 
@@ -33,9 +36,9 @@ class Message(object):
                         date_str,
                         '%Y-%m-%d %H:%M:%S'
                     ),
-                    'nickname': nickname,
-                    'qq': qq,
-                    'msg': msg,
+                    'nickname': nickname.strip(),
+                    'qq': qq.strip(),
+                    'msg': msg.strip(),
                 }
             except Exception as e:
                 logger.exception(e)
@@ -48,19 +51,94 @@ class Message(object):
         for msg in self._parse():
             self._handle(msg)
 
-if __name__ == '__main__':
+
+def main(file_name):
     from collections import defaultdict
     from io import open
-    check = defaultdict(lambda: defaultdict(dict))
 
+    from prettytable import (
+        # ALL,
+        # FRAME, NONE,
+        PrettyTable
+    )
+    import tablib
+
+    week_num = 1
+    try:
+        with open('a.txt') as f:
+            week_num = int(f.read().strip())
+    except Exception as e:
+        logger.exception(e)
+    
+    check = defaultdict(lambda: defaultdict(list))
+    today = datetime.datetime.today().date()
+    datas = [today + datetime.timedelta(days=i)
+             for i in range(0 - (7 * (week_num - 1)) - today.weekday(),
+                             7 - today.weekday())
+             ]
+    
     def handler(msg):
-        if datetime.datetime.now() - msg['date'] < datetime.timedelta(days=7):
-            if u"打卡" in msg['msg']:
-                check[msg['qq']][msg['date'].date()] = msg
+        if msg['date'].date() in datas:
+            if re.match(ur'\s*打卡', msg['msg']):
+                check[msg['qq']][msg['date'].date()].append(msg)
 
-    with open('data.txt', encoding='utf-8-sig') as f:
+    with open(file_name, encoding='utf-8-sig') as f:
         Message(f.read().replace('\r\n', '\n'), [handler])()
 
+    
+    table = PrettyTable([' Name'] + [u'%s' % (x.strftime('%m-%d(%a)')) for x in datas])
+    headers_csv = [u' Name'] + [x.strftime('%Y-%m-%d\n(%A)') for x in datas]
+    data_csv = []
+
     for v in check.values():
-        for x in v.values():
-            print(x['nickname'] + ', ' + str(x['date']))
+        name = u'%s(%s)' % (v.values()[-1][-1]['nickname'], v.values()[-1][-1]['qq'])
+        row_csv = [name]
+        row = [name[:15]]
+
+        for d in datas:
+            item = v[d]
+            if item:
+                # row.append(u'✔')
+                row.append(u'OK')
+                row_csv.append(u'\n'.join([x[u'msg'] + '\n' for x in item]))
+            else:
+                # row.append(u'✘')
+                row.append(u' ')
+                row_csv.append(u'')
+        table.add_row(row)
+        data_csv.append(row_csv)
+
+    # table.hrules = NONE
+    # table.hrules = FRAME
+    # table.hrules = ALL
+    table.align = 'c'
+    table.align[' Name'] = 'l'
+    table.valign = 'm'
+    table.valign[' Name'] = 'm'
+    table.padding_width = 1
+    # table.left_padding_width = 0
+    # table.right_padding_width = 0
+    print(table.get_string().encode(encoding, 'replace'))
+    with open('checkin_%s.xls' % today.strftime('%m-%d'), 'wb') as f:
+        f.write(tablib.Dataset(*data_csv, headers=headers_csv
+                               ).xls
+                )
+
+    raw_input('Finished! ')
+
+
+if __name__ == '__main__':
+    format_str = ('%(asctime)s - %(name)s'
+                  ' - %(funcName)s - %(lineno)d - %(levelname)s'
+                  ' - %(message)s')
+    logging.basicConfig(filename='debug.log', level=logging.DEBUG,
+                        format=format_str)
+    try:
+        file_name = 'data.txt'
+        if not os.path.exists(file_name):
+            raw_input(u'缺少 data.txt 文件'.encode(encoding))
+            sys.exit(1)
+        else:
+            main('data.txt')
+    except Exception as e:
+        logger.exception(e)
