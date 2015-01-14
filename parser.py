@@ -69,23 +69,22 @@ def main(file_name):
             week_num = int(f.read().strip())
     except Exception as e:
         logger.exception(e)
-    
+
     check = defaultdict(lambda: defaultdict(list))
     today = datetime.datetime.today().date()
     datas = [today + datetime.timedelta(days=i)
              for i in range(0 - (7 * (week_num - 1)) - today.weekday(),
-                             7 - today.weekday())
+                            7 - today.weekday())
              ]
-    
+
     def handler(msg):
         if msg['date'].date() in datas:
-            if re.match(ur'\s*打卡', msg['msg']):
+            if re.match(ur'^\s*打卡', msg['msg']):
                 check[msg['qq']][msg['date'].date()].append(msg)
 
     with open(file_name, encoding='utf-8-sig') as f:
         Message(f.read().replace('\r\n', '\n'), [handler])()
 
-    
     table = PrettyTable([' Name'] + [u'%s' % (x.strftime('%m-%d(%a)')) for x in datas])
     headers_csv = [u' Name'] + [x.strftime('%Y-%m-%d\n(%A)') for x in datas]
     data_csv = []
