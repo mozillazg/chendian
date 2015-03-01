@@ -79,7 +79,7 @@ def main(file_name):
 
     def handler(msg):
         if msg['date'].date() in datas:
-            if re.match(ur'^\s*打卡', msg['msg']):
+            if re.match(ur'^\s*#打卡', msg['msg']):
                 check[msg['qq']][msg['date'].date()].append(msg)
 
     with open(file_name, encoding='utf-8-sig') as f:
