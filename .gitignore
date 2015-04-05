@@ -41,3 +41,4 @@ tools/words.txt
 *.exe
 data.txt
 *.log
+*.xls

@@ -1,14 +1,47 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+from __future__ import absolute_import, print_function, unicode_literals
+
+import codecs
+import ConfigParser
 import datetime
 import logging
 import os
 import re
+from StringIO import StringIO
 import sys
 
-__version__ = '0.1.1'
+__version__ = '0.2.0'
 encoding = sys.stdout.encoding
 logger = logging.getLogger(__name__)
+
+
+def _decode(s):
+    if s.startswith(codecs.BOM_UTF8):
+        s = s.decode('utf-8-sig')
+    elif s.startswith(codecs.BOM_UTF16):
+        s = s.decode('utf_16')
+    else:
+        try:
+            s = s.decode('utf-8-sig')
+        except UnicodeDecodeError:
+            s = s.decode('gbk', 'ignore')
+    return s
+
+
+def parse_conf(f):
+    conf = ConfigParser.RawConfigParser()
+    with open(f, 'rb') as f:
+        content = _decode(f.read()).encode('utf8')
+        conf.readfp(StringIO(content))
+    keywords = _decode(conf.get('General', 'keyword')
+                       ).replace('，', ',').split(',')
+    keywords = map(re.escape, keywords)
+    week = int(conf.get('General', 'week'))
+    return {
+        'keywords': keywords,
+        'week': week,
+    }
 
 
 class Message(object):
@@ -63,12 +96,10 @@ def main(file_name):
     )
     import tablib
 
-    week_num = 1
-    try:
-        with open('a.txt') as f:
-            week_num = int(f.read().strip())
-    except Exception as e:
-        logger.exception(e)
+    conf = parse_conf('config.conf')
+    week_num = conf['week']
+    keywords = conf['keywords']
+    keyword_re = re.compile(ur'^\s*(?:%s)' % '|'.join(keywords))
 
     check = defaultdict(lambda: defaultdict(list))
     today = datetime.datetime.today().date()
@@ -79,7 +110,7 @@ def main(file_name):
 
     def handler(msg):
         if msg['date'].date() in datas:
-            if re.match(ur'^\s*#打卡', msg['msg']):
+            if keyword_re.match(msg['msg']):
                 check[msg['qq']][msg['date'].date()].append(msg)
 
     with open(file_name, encoding='utf-8-sig') as f:
