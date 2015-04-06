@@ -36,7 +36,7 @@ def parse_conf(f):
         conf.readfp(StringIO(content))
     keywords = _decode(conf.get('General', 'keyword')
                        ).replace('，', ',').split(',')
-    keywords = map(re.escape, keywords)
+    keywords = map(re.escape, [x.strip() for x in keywords if x.strip()])
     week = int(conf.get('General', 'week'))
     return {
         'keywords': keywords,
