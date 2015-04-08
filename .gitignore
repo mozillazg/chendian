@@ -42,3 +42,4 @@ tools/words.txt
 data.txt
 *.log
 *.xls
+setup.py

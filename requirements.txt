@@ -1,4 +1,2 @@
 tablib
 prettytable
-# pyinstaller
-# py2exe
