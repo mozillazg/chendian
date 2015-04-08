@@ -34,10 +34,14 @@ def parse_conf(f):
     with open(f, 'rb') as f:
         content = _decode(f.read()).encode('utf8')
         conf.readfp(StringIO(content))
-    keywords = _decode(conf.get('General', 'keyword')
-                       ).replace('，', ',').split(',')
-    keywords = map(re.escape, [x.strip() for x in keywords if x.strip()])
+    keyword = _decode(conf.get('General', 'keyword'))
     keyword_position = conf.get('General', 'keyword_position').strip()
+    keyword_mode = conf.get('General', 'keyword_mode').strip()
+    if keyword_mode == 'regex':
+        keywords = [ur'%s' % keyword]
+    else:
+        keywords = keyword.replace('，', ',').split(',')
+        keywords = map(re.escape, [x.strip() for x in keywords if x.strip()])
 
     week = int(conf.get('General', 'week'))
 
