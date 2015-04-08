@@ -93,14 +93,14 @@ class Message(object):
             self._handle(msg)
 
 
-def main(file_name):
+def main(file_name='data.txt', conf_file='config.ini'):
     from collections import defaultdict
     from io import open
 
     from prettytable import PrettyTable
     import tablib
 
-    conf = parse_conf('config.ini')
+    conf = parse_conf(conf_file)
     week_num = conf['week']
     keywords = conf['keywords']
     keyword_position = conf['keyword_position']
@@ -159,6 +159,7 @@ def main(file_name):
 
 
 if __name__ == '__main__':
+    import sys
     format_str = ('%(asctime)s - %(name)s'
                   ' - %(funcName)s - %(lineno)d - %(levelname)s'
                   ' - %(message)s')
@@ -166,10 +167,11 @@ if __name__ == '__main__':
                         format=format_str)
     try:
         file_name = 'data.txt'
+        conf_file = sys.argv[1] if len(sys.argv) > 1 else 'config.ini'
         if not os.path.exists(file_name):
             raw_input(u'缺少 data.txt 文件'.encode(encoding))
             sys.exit(1)
         else:
-            main('data.txt')
+            main(file_name, conf_file)
     except Exception as e:
         logger.exception(e)
