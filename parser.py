@@ -37,9 +37,13 @@ def parse_conf(f):
     keywords = _decode(conf.get('General', 'keyword')
                        ).replace('，', ',').split(',')
     keywords = map(re.escape, [x.strip() for x in keywords if x.strip()])
+    keyword_position = conf.get('General', 'keyword_position').strip()
+
     week = int(conf.get('General', 'week'))
+
     return {
         'keywords': keywords,
+        'keyword_position': keyword_position,
         'week': week,
     }
 
@@ -89,17 +93,19 @@ def main(file_name):
     from collections import defaultdict
     from io import open
 
-    from prettytable import (
-        # ALL,
-        # FRAME, NONE,
-        PrettyTable
-    )
+    from prettytable import PrettyTable
     import tablib
 
     conf = parse_conf('config.ini')
     week_num = conf['week']
     keywords = conf['keywords']
-    keyword_re = re.compile(ur'^\s*(?:%s)' % '|'.join(keywords))
+    keyword_position = conf['keyword_position']
+    if keyword_position == 'end':
+        keyword_re = re.compile(ur'(?:%s)\s*$' % '|'.join(keywords))
+    elif keyword_position == 'any':
+        keyword_re = re.compile(r'(?:%s)' % '|'.join(keywords))
+    else:
+        keyword_re = re.compile(ur'^\s*(?:%s)' % '|'.join(keywords))
 
     check = defaultdict(lambda: defaultdict(list))
     today = datetime.datetime.today().date()
@@ -110,7 +116,7 @@ def main(file_name):
 
     def handler(msg):
         if msg['date'].date() in datas:
-            if keyword_re.match(msg['msg']):
+            if keyword_re.search(msg['msg']):
                 check[msg['qq']][msg['date'].date()].append(msg)
 
     with open(file_name, encoding='utf-8-sig') as f:
@@ -128,31 +134,22 @@ def main(file_name):
         for d in datas:
             item = v[d]
             if item:
-                # row.append(u'✔')
                 row.append(u'OK')
                 row_csv.append(u'\n'.join([x[u'msg'] + '\n' for x in item]))
             else:
-                # row.append(u'✘')
                 row.append(u' ')
                 row_csv.append(u'')
         table.add_row(row)
         data_csv.append(row_csv)
 
-    # table.hrules = NONE
-    # table.hrules = FRAME
-    # table.hrules = ALL
     table.align = 'c'
     table.align[' Name'] = 'l'
     table.valign = 'm'
     table.valign[' Name'] = 'm'
     table.padding_width = 1
-    # table.left_padding_width = 0
-    # table.right_padding_width = 0
     print(table.get_string().encode(encoding, 'replace'))
     with open('checkin_%s.xls' % today.strftime('%m-%d'), 'wb') as f:
-        f.write(tablib.Dataset(*data_csv, headers=headers_csv
-                               ).xls
-                )
+        f.write(tablib.Dataset(*data_csv, headers=headers_csv).xls)
 
     raw_input('Finished! ')
 
