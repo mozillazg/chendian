@@ -96,7 +96,7 @@ def main(file_name):
     )
     import tablib
 
-    conf = parse_conf('config.conf')
+    conf = parse_conf('config.ini')
     week_num = conf['week']
     keywords = conf['keywords']
     keyword_re = re.compile(ur'^\s*(?:%s)' % '|'.join(keywords))
