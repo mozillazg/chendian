@@ -35,7 +35,11 @@ def parse_conf(f):
         content = _decode(f.read()).encode('utf8')
         conf.readfp(StringIO(content))
     keyword = _decode(conf.get('General', 'keyword'))
+
     keyword_position = conf.get('General', 'keyword_position').strip()
+    if keyword_position not in ['start', 'any', 'end']:
+        keyword_position = 'start'
+
     keyword_mode = conf.get('General', 'keyword_mode').strip()
     if keyword_mode == 'regex':
         keywords = [ur'%s' % keyword]
@@ -44,11 +48,15 @@ def parse_conf(f):
         keywords = map(re.escape, [x.strip() for x in keywords if x.strip()])
 
     week = int(conf.get('General', 'week'))
+    save_mode = conf.get('General', 'save_mode')
+    if save_mode not in ['all', 'match']:
+        save_mode = 'all'
 
     return {
         'keywords': keywords,
         'keyword_position': keyword_position,
         'week': week,
+        'save_mode': save_mode,
     }
 
 
@@ -105,11 +113,12 @@ def main(file_name='data.txt', conf_file='config.ini'):
     keywords = conf['keywords']
     keyword_position = conf['keyword_position']
     if keyword_position == 'end':
-        keyword_re = re.compile(ur'(?:%s)\s*$' % '|'.join(keywords))
+        keyword_re = re.compile(ur'(%s)\s*$' % '|'.join(keywords))
     elif keyword_position == 'any':
-        keyword_re = re.compile(r'(?:%s)' % '|'.join(keywords))
+        keyword_re = re.compile(r'(%s)' % '|'.join(keywords))
     else:
-        keyword_re = re.compile(ur'^\s*(?:%s)' % '|'.join(keywords))
+        keyword_re = re.compile(ur'^\s*(%s)' % '|'.join(keywords))
+    save_mode = conf['save_mode']
 
     check = defaultdict(lambda: defaultdict(list))
     today = datetime.datetime.today().date()
@@ -121,6 +130,10 @@ def main(file_name='data.txt', conf_file='config.ini'):
     def handler(msg):
         if msg['date'].date() in datas:
             if keyword_re.search(msg['msg']):
+                if save_mode != 'all':
+                    msg['msg'] = ' '.join(
+                        map(unicode, keyword_re.findall(msg['msg']))
+                    )
                 check[msg['qq']][msg['date'].date()].append(msg)
 
     with open(file_name, encoding='utf-8-sig') as f:
