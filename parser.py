@@ -11,8 +11,8 @@ import re
 from StringIO import StringIO
 import sys
 
-__version__ = '0.2.0'
-encoding = sys.stdout.encoding
+__version__ = '0.3.0'
+encoding = sys.stdout.encoding or 'utf8'
 logger = logging.getLogger(__name__)
 
 
@@ -34,13 +34,29 @@ def parse_conf(f):
     with open(f, 'rb') as f:
         content = _decode(f.read()).encode('utf8')
         conf.readfp(StringIO(content))
-    keywords = _decode(conf.get('General', 'keyword')
-                       ).replace('，', ',').split(',')
-    keywords = map(re.escape, [x.strip() for x in keywords if x.strip()])
+    keyword = _decode(conf.get('General', 'keyword'))
+
+    keyword_position = conf.get('General', 'keyword_position').strip()
+    if keyword_position not in ['start', 'any', 'end']:
+        keyword_position = 'start'
+
+    keyword_mode = conf.get('General', 'keyword_mode').strip()
+    if keyword_mode == 'regex':
+        keywords = [ur'%s' % keyword]
+    else:
+        keywords = keyword.replace('，', ',').split(',')
+        keywords = map(re.escape, [x.strip() for x in keywords if x.strip()])
+
     week = int(conf.get('General', 'week'))
+    save_mode = conf.get('General', 'save_mode')
+    if save_mode not in ['all', 'match']:
+        save_mode = 'all'
+
     return {
         'keywords': keywords,
+        'keyword_position': keyword_position,
         'week': week,
+        'save_mode': save_mode,
     }
 
 
@@ -85,21 +101,24 @@ class Message(object):
             self._handle(msg)
 
 
-def main(file_name):
+def main(file_name='data.txt', conf_file='config.ini'):
     from collections import defaultdict
     from io import open
 
-    from prettytable import (
-        # ALL,
-        # FRAME, NONE,
-        PrettyTable
-    )
+    from prettytable import PrettyTable
     import tablib
 
-    conf = parse_conf('config.conf')
+    conf = parse_conf(conf_file)
     week_num = conf['week']
     keywords = conf['keywords']
-    keyword_re = re.compile(ur'^\s*(?:%s)' % '|'.join(keywords))
+    keyword_position = conf['keyword_position']
+    if keyword_position == 'end':
+        keyword_re = re.compile(ur'(%s)\s*$' % '|'.join(keywords))
+    elif keyword_position == 'any':
+        keyword_re = re.compile(r'(%s)' % '|'.join(keywords))
+    else:
+        keyword_re = re.compile(ur'^\s*(%s)' % '|'.join(keywords))
+    save_mode = conf['save_mode']
 
     check = defaultdict(lambda: defaultdict(list))
     today = datetime.datetime.today().date()
@@ -110,7 +129,11 @@ def main(file_name):
 
     def handler(msg):
         if msg['date'].date() in datas:
-            if keyword_re.match(msg['msg']):
+            if keyword_re.search(msg['msg']):
+                if save_mode != 'all':
+                    msg['msg'] = ' '.join(
+                        map(unicode, keyword_re.findall(msg['msg']))
+                    )
                 check[msg['qq']][msg['date'].date()].append(msg)
 
     with open(file_name, encoding='utf-8-sig') as f:
@@ -128,36 +151,28 @@ def main(file_name):
         for d in datas:
             item = v[d]
             if item:
-                # row.append(u'✔')
                 row.append(u'OK')
                 row_csv.append(u'\n'.join([x[u'msg'] + '\n' for x in item]))
             else:
-                # row.append(u'✘')
                 row.append(u' ')
                 row_csv.append(u'')
         table.add_row(row)
         data_csv.append(row_csv)
 
-    # table.hrules = NONE
-    # table.hrules = FRAME
-    # table.hrules = ALL
     table.align = 'c'
     table.align[' Name'] = 'l'
     table.valign = 'm'
     table.valign[' Name'] = 'm'
     table.padding_width = 1
-    # table.left_padding_width = 0
-    # table.right_padding_width = 0
     print(table.get_string().encode(encoding, 'replace'))
     with open('checkin_%s.xls' % today.strftime('%m-%d'), 'wb') as f:
-        f.write(tablib.Dataset(*data_csv, headers=headers_csv
-                               ).xls
-                )
+        f.write(tablib.Dataset(*data_csv, headers=headers_csv).xls)
 
     raw_input('Finished! ')
 
 
 if __name__ == '__main__':
+    import sys
     format_str = ('%(asctime)s - %(name)s'
                   ' - %(funcName)s - %(lineno)d - %(levelname)s'
                   ' - %(message)s')
@@ -165,10 +180,11 @@ if __name__ == '__main__':
                         format=format_str)
     try:
         file_name = 'data.txt'
+        conf_file = sys.argv[1] if len(sys.argv) > 1 else 'config.ini'
         if not os.path.exists(file_name):
             raw_input(u'缺少 data.txt 文件'.encode(encoding))
             sys.exit(1)
         else:
-            main('data.txt')
+            main(file_name, conf_file)
     except Exception as e:
         logger.exception(e)
