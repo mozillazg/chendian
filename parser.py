@@ -12,7 +12,7 @@ from StringIO import StringIO
 import sys
 
 __version__ = '0.2.0'
-encoding = sys.stdout.encoding
+encoding = sys.stdout.encoding or 'utf8'
 logger = logging.getLogger(__name__)
 
 
