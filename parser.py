@@ -11,7 +11,7 @@ import re
 from StringIO import StringIO
 import sys
 
-__version__ = '0.2.0'
+__version__ = '0.3.0'
 encoding = sys.stdout.encoding or 'utf8'
 logger = logging.getLogger(__name__)
 
